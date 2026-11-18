@@ -1,0 +1,38 @@
+{
+  "name": "slate-monorepo",
+  "private": true,
+  "description": "Slate: TRMNL-style wall display server and browser kiosk client",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.33.4",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @slate/display build && pnpm --filter @slate/server dev",
+    "build": "pnpm -r build",
+    "start": "node apps/server/dist/slate.mjs",
+    "stage": "node scripts/stage.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@hono/node-server": "^1.19.19",
+    "@playwright/test": "^1.57.0",
+    "@slate/core": "workspace:*",
+    "@types/node": "^22.19.1",
+    "esbuild": "^0.27.0",
+    "eslint": "^9.39.1",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.47.0",
+    "vitest": "^4.0.10"
+  }
+}

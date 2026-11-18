@@ -1,0 +1,11 @@
+{
+  "name": "@slate/plugin-weather",
+  "version": "0.1.0",
+  "description": "Weather widget backed by the keyless Open-Meteo connector. Uses the user-set location.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@slate/sdk": "workspace:*"
+  }
+}

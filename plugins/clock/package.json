@@ -1,0 +1,7 @@
+{
+  "name": "@slate/plugin-clock",
+  "version": "0.1.0",
+  "description": "Live clock widget with swappable faces. Drop-and-go: no connector, no network.",
+  "license": "MIT",
+  "private": true
+}

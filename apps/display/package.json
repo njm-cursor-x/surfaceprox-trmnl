@@ -1,0 +1,17 @@
+{
+  "name": "@slate/display",
+  "version": "0.1.0",
+  "description": "Slate kiosk display client: playlist rotation, SSE updates, sandboxed widget iframes",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@slate/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^7.2.2"
+  }
+}

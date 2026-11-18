@@ -1,0 +1,13 @@
+.face-digital__time {
+  font-size: 4em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.face-digital__ampm {
+  font-size: 1.2em;
+}
+.face-digital__date {
+  margin-top: 0.4em;
+}

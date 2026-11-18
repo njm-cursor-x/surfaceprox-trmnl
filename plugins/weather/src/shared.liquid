@@ -1,0 +1,20 @@
+{% template weather_title %}
+<div class="title_bar">
+  <span class="title">{{ settings.location_name | default: location.name | default: "Weather" }}</span>
+  {% if meta.weather.stale and meta.weather.fetchedAt %}<span class="instance">updated {{ meta.weather.fetchedAt | time_ago }}</span>{% endif %}
+</div>
+{% endtemplate %}
+
+{% template weather_empty %}
+<div class="layout layout--col layout--center">
+  {% if location == nil and settings.lat == nil %}
+    <span class="title">Set your location</span>
+    <span class="label">Open the config page and add a location to see weather.</span>
+  {% elsif meta.weather.error %}
+    <span class="title">Weather unavailable</span>
+    <span class="label">{{ meta.weather.error }}</span>
+  {% else %}
+    <span class="label">Loading weather…</span>
+  {% endif %}
+</div>
+{% endtemplate %}

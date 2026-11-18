@@ -1,0 +1,10 @@
+{% if data.weather %}
+<div class="layout layout--col gap--large">
+  <span class="value value--xlarge">{{ data.weather.now.temp }}{{ data.weather.units }}</span>
+  <span class="title">{{ data.weather.now.code | wmo_label }}</span>
+  {% for d in data.weather.days %}
+  <span class="label">{{ d.date | date: "%a" }} {{ d.hi }}° / {{ d.lo }}°</span>
+  {% endfor %}
+</div>
+{% else %}{% render "weather_empty", location: location, settings: settings, meta: meta %}{% endif %}
+{% render "weather_title", location: location, settings: settings, meta: meta %}

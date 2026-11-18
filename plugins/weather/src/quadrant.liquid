@@ -1,0 +1,9 @@
+{% if data.weather %}
+<div class="layout layout--col">
+  <span class="value value--xlarge">{{ data.weather.now.temp }}{{ data.weather.units }}</span>
+  <span class="label">{{ data.weather.now.code | wmo_label }}</span>
+  {% assign today = data.weather.days | first %}
+  <span class="label label--small">H {{ today.hi }}° · L {{ today.lo }}°</span>
+</div>
+{% else %}{% render "weather_empty", location: location, settings: settings, meta: meta %}{% endif %}
+{% render "weather_title", location: location, settings: settings, meta: meta %}

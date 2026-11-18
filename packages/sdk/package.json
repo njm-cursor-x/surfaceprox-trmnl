@@ -1,0 +1,15 @@
+{
+  "name": "@slate/sdk",
+  "version": "0.1.0",
+  "description": "Slate plugin SDK: defineConnector, defineWidget, and test utilities",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./duration": "./src/duration.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "dependencies": {
+    "zod": "^4.1.12"
+  }
+}

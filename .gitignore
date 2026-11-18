@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.slate-data/
+plugins/*/connector.mjs
+*.log
+.DS_Store

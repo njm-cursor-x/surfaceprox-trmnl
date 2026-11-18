@@ -1,0 +1,29 @@
+name: Clock
+description: Live clock with swappable faces. No connector, no network.
+strategy: static
+custom_fields:
+  - keyname: face
+    field_type: select
+    name: Face
+    options: [digital, analog]
+    default: digital
+  - keyname: seconds
+    field_type: select
+    name: Show seconds
+    options: ["no", "yes"]
+    default: "no"
+  - keyname: time_zone
+    field_type: string
+    name: Time zone (blank = display's)
+    optional: true
+slate:
+  extension_points: [clock.face]
+  sizes:
+    min: { w: 2, h: 2 }
+    max: { w: 12, h: 8 }
+    default: { w: 4, h: 3 }
+    presets:
+      small: { w: 3, h: 2 }
+      medium: { w: 4, h: 3 }
+      wide: { w: 8, h: 3 }
+      full: { w: 12, h: 8 }

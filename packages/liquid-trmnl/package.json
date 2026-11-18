@@ -1,0 +1,13 @@
+{
+  "name": "@slate/liquid-trmnl",
+  "version": "0.1.0",
+  "description": "LiquidJS with TRMNL-compatible filters and the {% template %} tag",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "liquidjs": "^10.24.0"
+  }
+}

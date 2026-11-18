@@ -1,0 +1,21 @@
+{% if data.weather %}
+<div class="layout layout--col gap--large">
+  <div class="layout layout--row gap--large">
+    <span class="value value--xxlarge">{{ data.weather.now.temp }}{{ data.weather.units }}</span>
+    <div class="layout layout--col">
+      <span class="title">{{ data.weather.now.code | wmo_label }}</span>
+      <span class="label">Feels like {{ data.weather.now.feels }}° · Wind {{ data.weather.now.wind }}</span>
+    </div>
+  </div>
+  <div class="layout layout--row gap--large">
+    {% for d in data.weather.days %}
+    <div class="item layout layout--col">
+      <span class="label">{{ d.date | date: "%a" }}</span>
+      <span class="value">{{ d.hi }}° / {{ d.lo }}°</span>
+      <span class="label label--small">{{ d.code | wmo_label }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}{% render "weather_empty", location: location, settings: settings, meta: meta %}{% endif %}
+{% render "weather_title", location: location, settings: settings, meta: meta %}
