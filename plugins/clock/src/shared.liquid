@@ -1,0 +1,8 @@
+{% template clock %}
+{%- assign face = settings.face | default: "digital" -%}
+{%- assign face_partial = "clock.face/" | append: face -%}
+{%- assign tz = settings.time_zone | default: trmnl.user.time_zone -%}
+<div class="slate-clock slate-clock--{{ size }}" data-face="{{ face }}" data-tz="{{ tz }}" data-hour12="{% if units.time == '24h' %}false{% else %}true{% endif %}" data-seconds="{% if settings.seconds == 'yes' %}true{% else %}false{% endif %}">
+  {% include face_partial %}
+</div>
+{% endtemplate %}

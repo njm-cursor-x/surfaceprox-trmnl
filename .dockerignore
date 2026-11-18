@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+.git
+.slate-data
+coverage
+playwright-report
+test-results
+plugins/*/connector.mjs

@@ -1,0 +1,17 @@
+{
+  "name": "@slate/core",
+  "version": "0.1.0",
+  "description": "Slate core: grid layout, template mapping, playlists, night mode, cache, quotas, plugin loading",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./browser": "./src/browser.ts",
+    "./node": "./src/node/index.ts"
+  },
+  "dependencies": {
+    "@slate/sdk": "workspace:*",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.12"
+  }
+}

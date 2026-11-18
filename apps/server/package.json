@@ -1,0 +1,23 @@
+{
+  "name": "@slate/server",
+  "version": "0.1.0",
+  "description": "Slate server: plugin registry, connector runtime, Liquid renderer, SSE, LAN config UI",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "slate": "./dist/slate.mjs"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "node build.mjs",
+    "start": "node dist/slate.mjs"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "@slate/core": "workspace:*",
+    "@slate/liquid-trmnl": "workspace:*",
+    "@slate/sdk": "workspace:*",
+    "hono": "^4.10.6",
+    "yaml": "^2.8.1"
+  }
+}
