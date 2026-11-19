@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { E2E_PASSWORD } from "./constants.ts";
 
 const MAIN = "/d/e2e-main-display-token";
 const ROTATING = "/d/e2e-rotating-display-token";
@@ -7,6 +8,11 @@ const NIGHT = "/d/e2e-night-display-token";
 const cell = (page: Page, instance: string) => page.locator(`.cell[data-instance="${instance}"]`);
 const frame = (page: Page, instance: string) =>
   page.frameLocator(`.cell[data-instance="${instance}"] iframe`);
+
+test.beforeEach(async ({ page }) => {
+  const res = await page.request.post("/api/login", { data: { password: E2E_PASSWORD } });
+  expect(res.ok()).toBeTruthy();
+});
 
 async function getConfig(page: Page) {
   const res = await page.request.get("/api/config");

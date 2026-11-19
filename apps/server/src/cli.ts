@@ -13,7 +13,7 @@ Usage:
   slate [serve] [--port 8787] [--host 0.0.0.0] [--data-dir <dir>]
                             Run the server (the default command)
   slate setup-url [--qr]    Print the first-run setup link (and setup code) for this install
-  slate dev [plugin-dir] [--port 8788] [--lat <n> --lon <n>] [--tz <zone>]
+  slate dev [plugin-dir] [--port 8788] [--lat=<n> --lon=<n>] [--tz <zone>]
             [--units celsius|fahrenheit] [--fixture <url>=<file.json> ...]
                             Live preview of a plugin's widgets in all four TRMNL layouts,
                             at Surface (1440x960) and TRMNL OG (800x480) sizes

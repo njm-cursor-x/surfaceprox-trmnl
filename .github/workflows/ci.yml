@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: read
@@ -79,14 +80,16 @@ jobs:
           retention-days: 7
 
   windows-scripts:
-    name: PowerShell scripts parse
+    name: Installer scripts parse
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - shell: bash
+        run: sh -n install.sh
       - shell: pwsh
         run: |
           $failed = $false
-          Get-ChildItem deploy/windows/*.ps1 | ForEach-Object {
+          Get-ChildItem deploy/windows/*.ps1, install.ps1 | ForEach-Object {
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
             if ($errors) { $failed = $true; $errors | ForEach-Object { Write-Error "$($_.Extent.File):$($_.Extent.StartLineNumber) $($_.Message)" } }
@@ -108,3 +111,189 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  binaries:
+    name: Standalone binary (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: linux-x64 }
+          - { os: ubuntu-24.04-arm, target: linux-arm64 }
+          - { os: macos-latest, target: macos-arm64 }
+          - { os: macos-15-intel, target: macos-x64 }
+          - { os: windows-latest, target: win-x64 }
+          - { os: windows-11-arm, target: win-arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm build:binary
+      - name: Smoke-test the binary
+        shell: bash
+        run: |
+          bin=$(ls dist/bin/slate-* | grep -v sha256)
+          "$bin" version
+          "$bin" serve --port 8787 --data-dir "$RUNNER_TEMP/slate-data" &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8787/healthz && break; sleep 1; done
+          curl -sf -o /dev/null http://127.0.0.1:8787/setup
+          curl -sf http://127.0.0.1:8787/framework/3.4.6/trmnl-framework.css | grep -q "TRMNL Framework"
+          curl -sf http://127.0.0.1:8787/api/session | grep -q '"hasAdmin":false'
+          "$bin" setup-url --data-dir "$RUNNER_TEMP/slate-data" | grep -q "Setup code"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slate-${{ matrix.target }}
+          path: dist/bin/
+          retention-days: 14
+
+  acceptance-linux:
+    name: Acceptance (install.sh + wizard, live weather)
+    needs: binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/download-artifact@v4
+        with:
+          name: slate-linux-x64
+          path: bin
+      - name: Install with the one-liner (local binary instead of a release download)
+        run: sudo SLATE_BINARY=bin/slate-linux-x64 sh install.sh
+      - run: systemctl is-active slate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:acceptance
+        env:
+          SCREENSHOT_DIR: acceptance-screenshots/linux
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: acceptance-linux
+          path: |
+            acceptance-screenshots
+            test-results
+          retention-days: 14
+
+  acceptance-docker:
+    name: Acceptance (Docker + wizard from the LAN with a setup code)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: docker build -f deploy/docker/Dockerfile -t slate:ci .
+      - run: docker run -d --name slate -p 8787:8787 slate:ci
+      - name: Read the setup code
+        run: |
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8787/healthz && break; sleep 1; done
+          code=$(docker exec slate node apps/server/dist/slate.mjs setup-url | awk '/Setup code/ {print $3}')
+          test -n "$code"
+          echo "ACCEPTANCE_CODE=$code" >> "$GITHUB_ENV"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:acceptance
+        env:
+          SCREENSHOT_DIR: acceptance-screenshots/docker
+      - if: failure()
+        run: docker logs slate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: acceptance-docker
+          path: |
+            acceptance-screenshots
+            test-results
+          retention-days: 14
+
+  acceptance-windows:
+    name: Acceptance (install.ps1 + wizard, ${{ matrix.target }})
+    needs: binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: win-x64 }
+          - { os: windows-11-arm, target: win-arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/download-artifact@v4
+        with:
+          name: slate-${{ matrix.target }}
+          path: bin
+      - name: Install with the one-liner (local binary instead of a release download)
+        shell: powershell
+        run: |
+          $env:SLATE_BINARY = (Resolve-Path "bin/slate-${{ matrix.target }}.exe").Path
+          $env:SLATE_NO_BROWSER = '1'
+          ./install.ps1
+      - name: Check the install is locked down
+        shell: powershell
+        run: |
+          if ((Get-ScheduledTask -TaskName 'Slate Server').Principal.UserId -ne 'SYSTEM') { throw 'task is not SYSTEM' }
+          foreach ($dir in "$env:ProgramFiles\Slate", "$env:ProgramData\slate") {
+            $acl = Get-Acl $dir
+            $acl.Access | Format-Table IdentityReference, FileSystemRights -AutoSize | Out-String | Write-Host
+            $open = $acl.Access | Where-Object {
+              $_.AccessControlType -eq 'Allow' -and
+              $_.IdentityReference.Value -notmatch 'SYSTEM|Administrators' -and
+              ($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]'Write, CreateFiles, AppendData, Modify')
+            }
+            if ($open) { throw "$dir is writable by non-admins" }
+          }
+          $rule = Get-NetFirewallRule -DisplayName 'Slate (TCP 8787, Private)'
+          if (($rule | Get-NetFirewallAddressFilter).RemoteAddress -ne 'LocalSubnet') { throw 'firewall rule is not LocalSubnet' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install chromium
+      - run: pnpm test:acceptance
+        env:
+          SCREENSHOT_DIR: acceptance-screenshots/${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: acceptance-${{ matrix.target }}
+          path: |
+            acceptance-screenshots
+            test-results
+          retention-days: 14
+
+  release:
+    name: Publish release binaries
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [binaries, acceptance-linux, acceptance-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: slate-*
+          path: bin
+          merge-multiple: true
+      - run: |
+          cd bin
+          rm -f *.sha256
+          sha256sum slate-* > SHA256SUMS
+          cat SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: bin/*
+          generate_release_notes: true

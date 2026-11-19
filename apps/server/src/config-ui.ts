@@ -1,7 +1,7 @@
 import { UI_CSS } from "./ui-css.ts";
 
 /**
- * Phase 1a config UI skeleton: location, units, night mode, display links, health, and
+ * Config page behind the admin sign-in: location, units, night mode, display links, health, and
  * a raw YAML editor. The full phone PWA with the grid editor replaces this in Phase 2.
  */
 export function configUiHtml(): string {

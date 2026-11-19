@@ -21,7 +21,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "slate": "tsx apps/server/src/bin.ts",
-    "build:binary": "node scripts/build-sea.mjs"
+    "build:binary": "node scripts/build-sea.mjs",
+    "test:acceptance": "playwright test -c playwright.acceptance.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
