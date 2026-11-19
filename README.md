@@ -36,6 +36,11 @@ location on the config page to turn on weather; the clock works immediately.
 
 For development: `pnpm dev` (watches the server; data goes to `./.slate-data`).
 
+The server only answers requests addressed to an IP address, `localhost`, a single-label
+name, or a LAN suffix (`.local`, `.lan`, `.home.arpa`, `.internal`). This blocks DNS
+rebinding from websites. If you put Slate behind your own domain, list it in
+`SLATE_ALLOWED_HOSTS` (comma-separated, `*.example.com` allowed).
+
 ## Install
 
 There are two supported paths:

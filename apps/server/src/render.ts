@@ -33,6 +33,9 @@ const CSP = [
   "img-src data:",
   "font-src data:",
   "connect-src 'none'",
+  // Neither falls back to default-src.
+  "base-uri 'none'",
+  "form-action 'none'",
 ].join("; ");
 
 // The parent display posts theme changes; widgets can't reach the parent otherwise.

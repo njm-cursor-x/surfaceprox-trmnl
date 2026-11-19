@@ -10,9 +10,11 @@ import {
   type SlateConfig,
 } from "@slate/core";
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { streamSSE } from "hono/streaming";
 import { parse as parseYaml } from "yaml";
 import { configUiHtml } from "./config-ui.ts";
+import { lanGuard, parseAllowedHosts } from "./guard.ts";
 import { renderCell } from "./render.ts";
 import type { ConnectorRuntime } from "./runtime.ts";
 import type { ConfigStore } from "./store.ts";
@@ -26,6 +28,8 @@ export interface AppDeps {
   loadErrors?: { dir: string; error: string }[];
   pingMs?: number;
   geocodeFetch?: typeof fetch;
+  /** Extra Host names (e.g. a reverse-proxy domain); defaults to `SLATE_ALLOWED_HOSTS`. */
+  allowedHosts?: string[];
 }
 
 const MIME: Record<string, string> = {
@@ -75,6 +79,16 @@ export function createApp(deps: AppDeps) {
     bump();
   });
   runtime.on("change", bump);
+
+  app.use(lanGuard(deps.allowedHosts ?? parseAllowedHosts(process.env.SLATE_ALLOWED_HOSTS)));
+  app.on(
+    "PUT",
+    "/api/*",
+    bodyLimit({
+      maxSize: 1024 * 1024,
+      onError: (c) => c.json({ ok: false, error: "Request body too large" }, 413),
+    }),
+  );
 
   const displayByToken = (token: string) =>
     Object.entries(store.get().displays).find(([, d]) => d.token === token);

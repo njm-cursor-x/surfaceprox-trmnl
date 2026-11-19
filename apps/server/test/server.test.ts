@@ -91,6 +91,7 @@ describe("display API", () => {
     const weather = cells[1].html as string;
     expect(weather).toContain("Content-Security-Policy");
     expect(weather).toContain("connect-src 'none'");
+    expect(weather).toContain("base-uri 'none'");
     expect(weather).toContain("72°F");
     expect(weather).toContain("Testville");
     expect(cells[0].html).toContain("face-digital");
@@ -194,6 +195,60 @@ describe("config API", () => {
     const health = await (await req("/api/health")).json();
     expect(health.plugins.map((p: { id: string }) => p.id).sort()).toEqual(["clock", "weather"]);
     expect(health.loadErrors).toEqual([]);
+  });
+});
+
+describe("LAN guard", () => {
+  it("rejects Host names a remote site could rebind (DNS rebinding)", async () => {
+    const { req } = await setup();
+    const get = (host: string) => req("/api/config", { headers: { host } });
+    for (const ok of [
+      "localhost:8787",
+      "192.168.1.20:8787",
+      "[::1]:8787",
+      "surface",
+      "slate.local",
+    ])
+      expect((await get(ok)).status, ok).toBe(200);
+    for (const bad of ["evil.example.com", "rebind.attacker.net:8787", "192.168.1.20.nip.io"])
+      expect((await get(bad)).status, bad).toBe(403);
+  });
+
+  it("allows extra hosts from allowedHosts", async () => {
+    const slate = await createSlate({
+      dataDir: mkdtempSync(join(tmpdir(), "slate-test-")),
+      pluginDirs: [plugins],
+      displayDir: mkdtempSync(join(tmpdir(), "slate-display-")),
+      initialConfig: config(),
+      preferSource: true,
+      allowedHosts: ["slate.example.com"],
+    });
+    const res = await slate.app.request("/healthz", { headers: { host: "slate.example.com" } });
+    expect(res.status).toBe(200);
+  });
+
+  it("rejects cross-origin and oversized writes", async () => {
+    const { req, store } = await setup();
+    const put = (headers: Record<string, string>, body = JSON.stringify(store.get())) =>
+      req("/api/config", {
+        method: "PUT",
+        headers: { host: "192.168.1.20:8787", "content-type": "application/json", ...headers },
+        body,
+      });
+    expect((await put({ origin: "http://evil.example.com" })).status).toBe(403);
+    expect((await put({ origin: "null" })).status).toBe(403);
+    expect((await put({ origin: "http://192.168.1.20:8787" })).status).toBe(200);
+    expect((await put({}, "x".repeat(2 * 1024 * 1024))).status).toBe(413);
+  });
+
+  it("sets security headers and blocks framing of the config UI", async () => {
+    const { req } = await setup();
+    const ui = await req("/");
+    expect(ui.headers.get("x-frame-options")).toBe("DENY");
+    expect(ui.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
+    const api = await req("/api/health");
+    expect(api.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(api.headers.get("referrer-policy")).toBe("no-referrer");
   });
 });
 
