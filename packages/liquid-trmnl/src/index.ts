@@ -50,6 +50,8 @@ export function createLiquid(
     extname: "",
     jsTruthy: false,
     ownPropertyOnly: true,
+    // Unlike TRMNL, `{{ }}` output is HTML-escaped; recipes that emit markup use `| raw`.
+    outputEscape: "escape",
     renderLimit: 2_000,
     parseLimit: 1_000_000,
     memoryLimit: 64_000_000,

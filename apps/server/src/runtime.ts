@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import {
   ConnectorCache,
   connectorKey,
+  friendlyError,
   QuotaTracker,
   resolveBinding,
   stableStringify,
@@ -25,6 +26,8 @@ interface ActiveKey {
   connector: Connector;
   config: unknown;
 }
+
+const sourceName = (c: Connector) => c.name ?? c.id;
 
 export interface RuntimeOptions {
   fetch?: FetchLike;
@@ -80,7 +83,12 @@ export class ConnectorRuntime extends EventEmitter<{ change: [string] }> {
         continue;
       }
       const read = this.cache.read(resolved.key, resolved.connector.refreshMs, this.now());
-      out[alias] = { key: resolved.key, connector: binding.use, ...read };
+      out[alias] = {
+        key: resolved.key,
+        connector: binding.use,
+        ...read,
+        error: read.error && friendlyError(read.error, sourceName(resolved.connector)),
+      };
     }
     return out;
   }
@@ -93,7 +101,8 @@ export class ConnectorRuntime extends EventEmitter<{ change: [string] }> {
         connector: connector.id,
         fetchedAt: read.fetchedAt ?? null,
         stale: read.stale,
-        error: read.error ?? null,
+        error: read.error ? friendlyError(read.error, sourceName(connector)) : null,
+        detail: read.error ?? null,
         quota: this.quota(connector).usage(this.now()),
       };
     });
@@ -201,7 +210,7 @@ export class ConnectorRuntime extends EventEmitter<{ change: [string] }> {
       return {
         ok: false,
         unconfigured: true,
-        error: parsed.error.issues.map((i) => i.path.join(".")).join(", "),
+        error: `Missing or invalid settings: ${parsed.error.issues.map((i) => i.path.join(".")).join(", ")}`,
       };
     }
     return {

@@ -26,3 +26,9 @@ export function displayDistDir(env: NodeJS.ProcessEnv = process.env): string {
     ? resolve(env.SLATE_DISPLAY_DIR)
     : join(repoRoot, "apps", "display", "dist");
 }
+
+export function frameworkDir(env: NodeJS.ProcessEnv = process.env): string {
+  return env.SLATE_FRAMEWORK_DIR
+    ? resolve(env.SLATE_FRAMEWORK_DIR)
+    : join(repoRoot, "packages", "framework", "vendor");
+}

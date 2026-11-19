@@ -16,6 +16,8 @@ export interface SlateManifestBlock {
   connectors?: Record<string, ConnectorBinding>;
   embeds?: string[];
   extension_points?: string[];
+  /** CSS base for the widget. Plain TRMNL recipes (no `slate:` block) get `trmnl`. */
+  framework?: "trmnl" | "slate";
 }
 
 export interface TrmnlSettings {
@@ -57,6 +59,7 @@ export function widgetFromManifest(
     style: files.style,
     embeds: s.embeds,
     extensionPoints: s.extension_points,
+    framework: s.framework ?? (settings.slate ? "slate" : "trmnl"),
     refreshMinutes: settings.refresh_frequency,
   });
 }

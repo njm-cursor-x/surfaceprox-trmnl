@@ -1,0 +1,19 @@
+{
+  "name": "@slate/framework",
+  "version": "0.1.0",
+  "description": "Pinned, trimmed TRMNL Framework CSS build plus the Slate theme adapter",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs"
+  },
+  "devDependencies": {
+    "postcss": "^8.5.33"
+  },
+  "dependencies": {
+    "@slate/sdk": "workspace:*"
+  }
+}

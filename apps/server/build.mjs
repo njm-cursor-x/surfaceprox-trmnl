@@ -1,4 +1,5 @@
-// Bundles the server into one ESM file (a future Node SEA input) and compiles
+// Bundles the `slate` CLI/server into one ESM file (scripts/build-sea.mjs rebundles it
+// as CommonJS for the standalone binary) and compiles
 // first-party plugin connectors so plain Node can load them without a TS loader.
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -13,7 +14,7 @@ const banner = {
 };
 
 await build({
-  entryPoints: [join(here, "src", "main.ts")],
+  entryPoints: [join(here, "src", "bin.ts")],
   outfile: join(here, "dist", "slate.mjs"),
   bundle: true,
   platform: "node",

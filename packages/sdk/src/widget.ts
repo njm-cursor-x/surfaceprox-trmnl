@@ -54,6 +54,11 @@ export interface WidgetDefinition {
   /** Extension points whose contributions this widget renders, e.g. `clock.face`. */
   extensionPoints?: string[];
   refreshMinutes?: number;
+  /**
+   * `trmnl` wraps the widget in the vendored TRMNL Framework (`.trmnl .screen .view`);
+   * `slate` (default) uses Slate's theme-token base styles only.
+   */
+  framework?: "trmnl" | "slate";
 }
 
 export interface Widget extends WidgetDefinition {
