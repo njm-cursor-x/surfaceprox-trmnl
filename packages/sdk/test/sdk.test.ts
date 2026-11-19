@@ -44,6 +44,31 @@ describe("createScopedFetch", () => {
     await expect(f("https://cdn.example.com/")).rejects.toBeInstanceOf(HostNotAllowedError);
     await expect(f("file:///etc/passwd")).rejects.toBeInstanceOf(HostNotAllowedError);
   });
+
+  it("follows redirects only to declared hosts", async () => {
+    const seen: string[] = [];
+    const base = async (input: string | URL | Request) => {
+      const url = String(input instanceof Request ? input.url : input);
+      seen.push(url);
+      const to: Record<string, string> = {
+        "https://api.example.com/a": "/b",
+        "https://api.example.com/b": "https://img.cdn.example.com/c",
+        "https://api.example.com/evil": "http://192.168.1.1/admin",
+      };
+      return to[url]
+        ? new Response(null, { status: 302, headers: { location: to[url]! } })
+        : new Response("ok");
+    };
+    const f = createScopedFetch(["api.example.com", "*.cdn.example.com"], base);
+    expect(await (await f("https://api.example.com/a")).text()).toBe("ok");
+    expect(seen).toEqual([
+      "https://api.example.com/a",
+      "https://api.example.com/b",
+      "https://img.cdn.example.com/c",
+    ]);
+    await expect(f("https://api.example.com/evil")).rejects.toBeInstanceOf(HostNotAllowedError);
+    expect(seen).not.toContain("http://192.168.1.1/admin");
+  });
 });
 
 describe("defineConnector", () => {

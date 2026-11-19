@@ -16,6 +16,7 @@ export interface SlateServerOptions {
   fetch?: FetchLike;
   tickMs?: number;
   pingMs?: number;
+  allowedHosts?: string[];
 }
 
 /** Wires plugins, config store, connector runtime, and HTTP app. */
@@ -34,6 +35,7 @@ export async function createSlate(opts: SlateServerOptions) {
     displayDir: opts.displayDir ?? displayDistDir(),
     loadErrors: errors,
     pingMs: opts.pingMs,
+    allowedHosts: opts.allowedHosts,
   });
   return { app, store, registry, runtime, loadErrors: errors };
 }
