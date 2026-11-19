@@ -42,7 +42,9 @@ if (-not [Uri]::TryCreate($Url, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme 
 # Both URLs go into single-quoted strings in the generated launcher.
 $quote = { param($s) "'" + $s.Replace("'", "''") + "'" }
 $kioskUrl = & $quote $uri.AbsoluteUri
-$health = & $quote ("{0}://{1}/healthz" -f $uri.Scheme, $uri.Authority)
+# The server listens on IPv4; "localhost" can resolve to ::1 first and time out.
+$healthHost = if ($uri.IsLoopback -and -not $uri.HostNameType.Equals([UriHostNameType]::IPv6)) { '127.0.0.1' } else { $uri.Host }
+$health = & $quote ("{0}://{1}:{2}/healthz" -f $uri.Scheme, $healthHost, $uri.Port)
 
 New-Item -ItemType Directory -Force -Path $LauncherDir | Out-Null
 # install.ps1 restricts C:\ProgramData\slate to admins; the kiosk user only needs to read this.

@@ -91,7 +91,7 @@ Start-ScheduledTask -TaskName $TaskName
 $healthy = $false
 foreach ($i in 1..30) {
   try {
-    if ((Invoke-WebRequest -UseBasicParsing "http://localhost:$Port/healthz" -TimeoutSec 2).StatusCode -eq 200) { $healthy = $true; break }
+    if ((Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$Port/healthz" -TimeoutSec 2).StatusCode -eq 200) { $healthy = $true; break }
   } catch { Start-Sleep -Seconds 1 }
 }
 if (-not $healthy) { throw "Slate did not answer on port $Port. Check Task Scheduler > '$TaskName' > History." }

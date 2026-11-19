@@ -100,16 +100,28 @@ New-NetFirewallRule -DisplayName $RuleName -Direction Inbound -Protocol TCP -Loc
   -Profile Private -RemoteAddress LocalSubnet -Program $Exe -Action Allow | Out-Null
 
 Start-ScheduledTask -TaskName $TaskName
+# The server listens on IPv4; "localhost" can resolve to ::1 first and time out.
 $healthy = $false
 foreach ($i in 1..60) {
   try {
-    if ((Invoke-WebRequest -UseBasicParsing "http://localhost:$Port/healthz" -TimeoutSec 2).StatusCode -eq 200) { $healthy = $true; break }
+    if ((Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$Port/healthz" -TimeoutSec 2).StatusCode -eq 200) { $healthy = $true; break }
   } catch { Start-Sleep -Seconds 1 }
 }
-if (-not $healthy) { throw "Slate did not answer on port $Port. Check Task Scheduler > '$TaskName' > History." }
+if (-not $healthy) {
+  $info = Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction SilentlyContinue
+  Write-Host "Task state: $((Get-ScheduledTask -TaskName $TaskName).State); last result: $($info.LastTaskResult)"
+  Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+  $log = Join-Path $env:TEMP 'slate-install-check.log'
+  $p = Start-Process -FilePath $Exe -ArgumentList 'serve', '--port', $Port, '--data-dir', "`"$DataDir`"" `
+    -RedirectStandardOutput $log -RedirectStandardError "$log.err" -PassThru -NoNewWindow
+  Start-Sleep -Seconds 10
+  if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
+  Get-Content $log, "$log.err" -ErrorAction SilentlyContinue | Write-Host
+  throw "Slate did not answer on port $Port. Check Task Scheduler > '$TaskName' > History."
+}
 
 Write-Host ''
 Write-Host 'Slate is running.'
 & $Exe setup-url --qr --port $Port --data-dir $DataDir
 Write-Host '(Phones need the Wi-Fi network set to Private in Windows settings.)'
-if ($env:SLATE_NO_BROWSER -ne '1') { Start-Process "http://localhost:$Port/setup" }
+if ($env:SLATE_NO_BROWSER -ne '1') { Start-Process "http://127.0.0.1:$Port/setup" }
