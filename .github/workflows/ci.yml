@@ -138,13 +138,20 @@ jobs:
       - name: Smoke-test the binary
         shell: bash
         run: |
-          bin=$(ls dist/bin/slate-* | grep -v sha256)
+          bin=$(find dist/bin -name 'slate-*' ! -name '*.sha256' | head -n 1)
           "$bin" version
           "$bin" serve --port 8787 --data-dir "$RUNNER_TEMP/slate-data" &
-          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8787/healthz && break; sleep 1; done
+          ok=0
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://127.0.0.1:8787/healthz; then ok=1; break; fi
+            sleep 1
+          done
+          test "$ok" = 1
           curl -sf -o /dev/null http://127.0.0.1:8787/setup
-          curl -sf http://127.0.0.1:8787/framework/3.4.6/trmnl-framework.css | grep -q "TRMNL Framework"
-          curl -sf http://127.0.0.1:8787/api/session | grep -q '"hasAdmin":false'
+          curl -sf -o "$RUNNER_TEMP/fw.css" http://127.0.0.1:8787/framework/3.4.6/trmnl-framework.css
+          grep -q "TRMNL Framework" "$RUNNER_TEMP/fw.css"
+          session=$(curl -sf http://127.0.0.1:8787/api/session)
+          printf '%s' "$session" | grep -q '"hasAdmin":false'
           "$bin" setup-url --data-dir "$RUNNER_TEMP/slate-data" | grep -q "Setup code"
       - uses: actions/upload-artifact@v4
         with:
