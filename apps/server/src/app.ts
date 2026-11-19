@@ -3,34 +3,62 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize, sep } from "node:path";
 import {
   ConfigSchema,
+  LAYOUT_TEMPLATES,
   referenceIssues,
   validateLayout,
   type ConfigIssue,
   type Registry,
   type SlateConfig,
 } from "@slate/core";
-import { Hono, type Context } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { streamSSE } from "hono/streaming";
 import { parse as parseYaml } from "yaml";
+import {
+  LoginLimiter,
+  MIN_PASSWORD,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_S,
+  type AuthStore,
+} from "./auth.ts";
 import { configUiHtml } from "./config-ui.ts";
 import { lanGuard, parseAllowedHosts } from "./guard.ts";
-import { renderCell } from "./render.ts";
+import { lanUrls } from "./net.ts";
+import { qrSvg } from "./qr.ts";
+import { FRAMEWORK_HEADERS, FRAMEWORK_PATH, frameworkStylesheet, renderCell } from "./render.ts";
 import type { ConnectorRuntime } from "./runtime.ts";
+import { applyStarter, newDisplay, STARTERS } from "./starters.ts";
 import type { ConfigStore } from "./store.ts";
 import { THEMES } from "./themes.ts";
+import { wizardHtml } from "./wizard-ui.ts";
 
 export interface AppDeps {
   store: ConfigStore;
+  auth: AuthStore;
   registry: Registry;
   runtime: ConnectorRuntime;
   displayDir: string;
+  frameworkDir: string;
   loadErrors?: { dir: string; error: string }[];
   pingMs?: number;
   geocodeFetch?: typeof fetch;
   /** Extra Host names (e.g. a reverse-proxy domain); defaults to `SLATE_ALLOWED_HOSTS`. */
   allowedHosts?: string[];
+  port?: number;
+  /** Peer address of a request; node-server exposes it on `c.env.incoming`. */
+  clientAddress?: (c: Context) => string | undefined;
 }
+
+type NodeEnv = { incoming?: { socket?: { remoteAddress?: string } } };
+const nodeClientAddress = (c: Context) =>
+  (c.env as NodeEnv | undefined)?.incoming?.socket?.remoteAddress;
+
+const LOOPBACK_ADDR = /^(127\.|::1$|::ffff:127\.)/;
+const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i;
+
+/** Public: the display endpoints carry their own token; these are needed to sign in. */
+const PUBLIC_API = new Set(["/api/session", "/api/login", "/api/logout", "/api/setup/admin"]);
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -82,13 +110,44 @@ export function createApp(deps: AppDeps) {
 
   app.use(lanGuard(deps.allowedHosts ?? parseAllowedHosts(process.env.SLATE_ALLOWED_HOSTS)));
   app.on(
-    "PUT",
+    ["PUT", "POST"],
     "/api/*",
     bodyLimit({
       maxSize: 1024 * 1024,
       onError: (c) => c.json({ ok: false, error: "Request body too large" }, 413),
     }),
   );
+
+  const { auth } = deps;
+  const limiter = new LoginLimiter();
+  const clientAddress = deps.clientAddress ?? nodeClientAddress;
+  const clientKey = (c: Context) => clientAddress(c) ?? "unknown";
+  /**
+   * Same machine, by peer address *and* Host header: the Host check stops a DNS-rebound
+   * page in the kiosk browser from passing as local.
+   */
+  const isLocal = (c: Context) =>
+    LOOPBACK_ADDR.test(clientAddress(c) ?? "") && LOOPBACK_HOST.test(c.req.header("host") ?? "");
+  const authenticated = (c: Context) => auth.verifySession(getCookie(c, SESSION_COOKIE));
+  const startSession = (c: Context) =>
+    setCookie(c, SESSION_COOKIE, auth.issueSession(), {
+      httpOnly: true,
+      sameSite: "Strict",
+      path: "/",
+      maxAge: SESSION_MAX_AGE_S,
+    });
+
+  const requireAdmin: MiddlewareHandler = async (c, next) => {
+    if (PUBLIC_API.has(c.req.path) || c.req.path.startsWith("/api/display/")) return next();
+    if (!authenticated(c)) {
+      return c.json(
+        { ok: false, error: auth.hasAdmin() ? "Sign in required" : "Finish setup first" },
+        401,
+      );
+    }
+    await next();
+  };
+  app.use("/api/*", requireAdmin);
 
   const displayByToken = (token: string) =>
     Object.entries(store.get().displays).find(([, d]) => d.token === token);
@@ -107,6 +166,145 @@ export function createApp(deps: AppDeps) {
   };
 
   app.get("/healthz", (c) => c.json({ ok: true, version }));
+
+  const readJson = async (c: Context) =>
+    requireType(c, ["application/json"])
+      ? ((await c.req.json().catch(() => null)) as Record<string, unknown> | null)
+      : undefined;
+
+  app.get("/api/session", (c) => {
+    const ok = authenticated(c);
+    return c.json({
+      authenticated: ok,
+      hasAdmin: auth.hasAdmin(),
+      setupComplete: auth.setupComplete,
+      needsCode: !auth.hasAdmin() && !isLocal(c),
+      minPassword: MIN_PASSWORD,
+      ...(ok ? { lanUrls: lanUrls(deps.port ?? 8787) } : {}),
+    });
+  });
+
+  app.post("/api/setup/admin", async (c) => {
+    const body = await readJson(c);
+    if (body === undefined) return c.json({ ok: false, error: "Expected application/json" }, 415);
+    if (auth.hasAdmin())
+      return c.json({ ok: false, error: "Setup is already done. Sign in instead." }, 409);
+    const key = clientKey(c);
+    if (limiter.blocked(key))
+      return c.json({ ok: false, error: "Too many attempts. Wait a few minutes." }, 429);
+    if (!isLocal(c) && !auth.checkSetupCode(body?.code)) {
+      limiter.fail(key);
+      return c.json({ ok: false, error: "That setup code doesn't match." }, 403);
+    }
+    const password = body?.password;
+    if (typeof password !== "string" || password.length < MIN_PASSWORD) {
+      return c.json(
+        { ok: false, error: `Use a password of at least ${MIN_PASSWORD} characters.` },
+        400,
+      );
+    }
+    auth.createAdmin(password);
+    limiter.reset(key);
+    startSession(c);
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/login", async (c) => {
+    const body = await readJson(c);
+    if (body === undefined) return c.json({ ok: false, error: "Expected application/json" }, 415);
+    const key = clientKey(c);
+    if (limiter.blocked(key))
+      return c.json({ ok: false, error: "Too many attempts. Wait a few minutes." }, 429);
+    if (!auth.verifyPassword(body?.password)) {
+      limiter.fail(key);
+      return c.json({ ok: false, error: "Wrong password." }, 401);
+    }
+    limiter.reset(key);
+    startSession(c);
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/logout", (c) => {
+    deleteCookie(c, SESSION_COOKIE, { path: "/" });
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/password", async (c) => {
+    const body = await readJson(c);
+    if (body === undefined) return c.json({ ok: false, error: "Expected application/json" }, 415);
+    if (!auth.verifyPassword(body?.current))
+      return c.json({ ok: false, error: "Current password is wrong." }, 403);
+    try {
+      auth.setPassword(String(body?.next ?? ""));
+    } catch (err) {
+      return c.json({ ok: false, error: (err as Error).message }, 400);
+    }
+    startSession(c);
+    return c.json({ ok: true });
+  });
+
+  app.get("/api/starters", (c) =>
+    c.json({
+      starters: STARTERS.map(({ id, name, description, layout, instances }) => ({
+        id,
+        name,
+        description,
+        layout,
+        widgets: instances.map((i) => i.name ?? registry.widgets.get(i.widget)?.name ?? i.widget),
+      })),
+      templates: LAYOUT_TEMPLATES,
+    }),
+  );
+
+  app.post("/api/setup/starter", async (c) => {
+    const body = await readJson(c);
+    if (body === undefined) return c.json({ ok: false, error: "Expected application/json" }, 415);
+    let next: SlateConfig;
+    try {
+      next = applyStarter(store.get(), String(body?.starter ?? ""));
+    } catch (err) {
+      return c.json({ ok: false, error: (err as Error).message }, 400);
+    }
+    return save(c, next);
+  });
+
+  app.post("/api/displays", async (c) => {
+    const body = await readJson(c);
+    if (body === undefined) return c.json({ ok: false, error: "Expected application/json" }, 415);
+    const config = store.get();
+    const playlist = Object.keys(config.playlists)[0];
+    if (!playlist) return c.json({ ok: false, error: "Add a screen first." }, 400);
+    const name =
+      String(body?.name ?? "")
+        .trim()
+        .slice(0, 60) || "New display";
+    let n = Object.keys(config.displays).length + 1;
+    while (config.displays[`display-${n}`]) n++;
+    const id = `display-${n}`;
+    const res = save(c, {
+      ...config,
+      displays: { ...config.displays, [id]: newDisplay(playlist, name) },
+    });
+    return res.status === 200 ? c.json({ ok: true, id, config: store.get() }) : res;
+  });
+
+  app.get("/api/qr.svg", (c) => {
+    const text = c.req.query("text") ?? "";
+    if (!text || text.length > 1024) return c.text("Expected ?text= up to 1024 characters", 400);
+    return c.body(qrSvg(text), 200, {
+      "content-type": "image/svg+xml",
+      "cache-control": "private, max-age=3600",
+    });
+  });
+
+  app.post("/api/setup/complete", (c) => {
+    auth.completeSetup();
+    return c.json({ ok: true });
+  });
+
+  app.get(FRAMEWORK_PATH, (c) =>
+    c.body(frameworkStylesheet(deps.frameworkDir), 200, FRAMEWORK_HEADERS),
+  );
 
   app.get("/api/health", (c) =>
     c.json({
@@ -223,6 +421,8 @@ export function createApp(deps: AppDeps) {
             bindings: runtime.bindingsFor(item.instance),
             theme: display.theme,
             timezone,
+            displaySize: { width: display.width, height: display.height },
+            assetOrigin: new URL(c.req.url).origin,
           }),
         ),
       );
@@ -283,7 +483,8 @@ export function createApp(deps: AppDeps) {
     return serveDisplayFile(c, "index.html");
   });
 
-  app.get("/", (c) => c.html(configUiHtml()));
+  app.get("/setup", (c) => c.html(wizardHtml()));
+  app.get("/", (c) => (auth.hasAdmin() ? c.html(configUiHtml()) : c.redirect("/setup")));
 
   return {
     app,

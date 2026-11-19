@@ -22,6 +22,34 @@ my-plugin/
 A plain TRMNL recipe (`settings.yml` + `src/*.liquid`) already loads as a widget.
 Slate ignores TRMNL keys it doesn't use.
 
+## Preview with `slate dev`
+
+```bash
+slate dev plugins/my-plugin                    # or: pnpm slate dev plugins/my-plugin
+slate dev plugins/weather --lat 45.5 --lon=-122.7 --tz America/Los_Angeles
+slate dev plugins/weather --fixture https://api.open-meteo.com/v1/forecast=test/fixtures/forecast.json
+```
+
+It opens http://localhost:8788 with every widget in all four TRMNL layouts (`full`,
+`half_horizontal`, `half_vertical`, `quadrant`), at Surface Pro X (1440×960) and TRMNL
+OG (800×480) sizes. Connectors run for real; `--fixture <url>=<file.json>` answers
+requests to that URL from a file instead. Saving any file in the plugin reloads the
+preview. Pass a folder of plugins to preview them all.
+
+## Styles: TRMNL Framework or Slate
+
+Plain TRMNL recipes render with the [TRMNL Framework](https://github.com/usetrmnl/trmnl-framework)
+CSS (pinned to 3.4.6, trimmed to the layout, typography, spacing, grid, flex, and
+title-bar classes, about 160 KB). Each widget gets `<html class="trmnl">`,
+`<div class="screen"><div class="view view--full">` (or the layout in use), and
+`--device-ui-scale` sized to its slot. Colours map to Slate's theme tokens, so night and
+dark themes still apply. Charts, maps, tables, and rich text aren't included yet.
+
+Widgets with a `slate:` block use Slate's smaller base styles instead. Either can choose
+with `slate: { framework: trmnl }` or `slate: { framework: slate }`. To update the vendored
+CSS, change the pinned version and checksum in `packages/framework/scripts/vendor.mjs`
+and run `pnpm --filter @slate/framework vendor`.
+
 ## Connector
 
 ```ts
@@ -85,6 +113,10 @@ The template variant comes from the slot's shape: wide slots use `half_horizonta
 slots use `half_vertical`, large slots use `full`, and small slots use `quadrant`. If the
 widget doesn't ship that variant, the closest one it does ship is used.
 
+Output is HTML-escaped: `{{ data.name }}` shows `<b>` as text. This differs from TRMNL,
+which doesn't escape. To output trusted HTML, use `{{ value | raw }}`. Widgets run in a
+sandbox either way; escaping stops connector data from changing the widget's markup.
+
 Template variables: `data.<alias>` (connector output),
 `meta.<alias>.{fetchedAt,stale,error,unconfigured}`, `settings`, `location`, `units`,
 `instance`, `slot`, and TRMNL's `trmnl.plugin_settings` and `trmnl.user.time_zone`.
@@ -93,5 +125,5 @@ Template variables: `data.<alias>` (connector output),
 
 Each widget renders in an `<iframe sandbox="allow-scripts">` with a CSP of
 `default-src 'none'`, so `client.js` can't make network requests or reach the display
-page. Style with theme tokens (`var(--ink)`, `var(--paper)`, `var(--muted)`,
+page. TRMNL Framework widgets also load one stylesheet from the Slate server. Style with theme tokens (`var(--ink)`, `var(--paper)`, `var(--muted)`,
 `var(--accent)`) so night and dark themes apply.

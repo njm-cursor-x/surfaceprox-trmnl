@@ -1,5 +1,7 @@
+import { UI_CSS } from "./ui-css.ts";
+
 /**
- * Phase 1a config UI skeleton: location, units, night mode, display links, health, and
+ * Config page behind the admin sign-in: location, units, night mode, display links, health, and
  * a raw YAML editor. The full phone PWA with the grid editor replaces this in Phase 2.
  */
 export function configUiHtml(): string {
@@ -7,32 +9,20 @@ export function configUiHtml(): string {
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Slate config</title>
-<style>
-:root{--paper:#f4f2ec;--ink:#1b1a17;--muted:#6b6860;--accent:#b3261e;--card:#ebe8df;--line:#d3cfc3}
-@media (prefers-color-scheme:dark){:root{--paper:#121210;--ink:#e2e0d9;--muted:#9a978e;--accent:#e0715f;--card:#1c1b18;--line:#34332e}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-main{max-width:720px;margin:0 auto;padding:16px 16px 64px}
-h1{font-size:1.5rem;margin:8px 0 4px}h2{font-size:1.05rem;margin:0 0 12px}
-p.sub{color:var(--muted);margin:0 0 16px}
-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0}
-label{display:block;font-size:.9rem;color:var(--muted);margin:10px 0 4px}
-input,select,textarea,button{font:inherit;color:inherit}
-input,select,textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--paper)}
-input[type=checkbox]{width:auto;margin-right:8px}input[type=range]{padding:0}
-textarea{min-height:320px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-button{padding:10px 16px;border-radius:8px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);cursor:pointer;min-height:44px}
-button.secondary{background:transparent;color:var(--ink)}
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-.results button{display:block;width:100%;text-align:left;margin-top:6px;background:var(--paper);color:var(--ink);border-color:var(--line)}
-.status{min-height:1.4em;font-size:.9rem;margin-top:8px}.status.err{color:var(--accent)}
-ul{padding-left:18px;margin:0}li{margin:4px 0}code{font-size:.85em;word-break:break-all}
-a{color:inherit}
-</style></head>
+<style>${UI_CSS}</style></head>
 <body><main>
 <h1>Slate</h1>
 <p class="sub">Configure this display from any browser on your network.</p>
+
+<section id="login" hidden><h2>Sign in</h2>
+  <form id="login-form">
+    <label for="login-pw">Admin password</label><input id="login-pw" type="password" autocomplete="current-password" required>
+    <div class="actions"><button type="submit">Sign in</button></div>
+  </form>
+  <div class="status" id="login-status"></div>
+</section>
+<div id="app" hidden>
+<p class="sub"><a href="/setup">Run the setup wizard again</a> · <a href="#" id="logout">Sign out</a></p>
 
 <section id="displays"><h2>Displays</h2><ul id="display-list"></ul></section>
 
@@ -47,7 +37,8 @@ a{color:inherit}
   </div>
   <label for="loc-name">Label</label><input id="loc-name">
   <label for="loc-tz">Time zone</label><input id="loc-tz" placeholder="e.g. America/Los_Angeles">
-  <div class="actions"><button id="loc-save">Save location</button><button class="secondary" id="loc-geo">Use this device's location</button></div>
+  <div class="actions"><button id="loc-save">Save location</button><button class="secondary" id="loc-geo" hidden>Use this device's location</button></div>
+  <p class="sub" id="loc-geo-note" hidden>Sharing this device's location needs HTTPS or localhost, so it's off here. Search for your city instead.</p>
   <div class="status" id="loc-status"></div>
 </section>
 
@@ -81,6 +72,7 @@ a{color:inherit}
   <div class="actions"><button id="yaml-save">Save YAML</button><button class="secondary" id="yaml-reload">Reload</button></div>
   <div class="status" id="yaml-status"></div>
 </section>
+</div>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -123,7 +115,7 @@ async function load() {
   const h = await (await fetch("/api/health")).json(); const ul = $("health"); ul.innerHTML = "";
   for (const p of h.plugins) { const li = document.createElement("li"); li.textContent = p.name + ": " + [...p.widgets.map((w) => "widget " + w), ...p.connectors.map((c) => "connector " + c)].join(", "); ul.append(li); }
   for (const e of h.loadErrors) { const li = document.createElement("li"); li.textContent = "Failed to load " + e.dir + ": " + e.error; ul.append(li); }
-  for (const c of h.connectors) { const li = document.createElement("li"); li.textContent = c.connector + ": " + (c.error ? "error: " + c.error : c.fetchedAt ? "updated " + new Date(c.fetchedAt).toLocaleTimeString() : "waiting"); ul.append(li); }
+  for (const c of h.connectors) { const li = document.createElement("li"); li.textContent = c.connector + ": " + (c.error ? c.error + " (" + c.detail + ")" : c.fetchedAt ? "updated " + new Date(c.fetchedAt).toLocaleTimeString() : "waiting"); ul.append(li); }
 }
 let searchTimer;
 $("loc-q").addEventListener("input", (e) => {
@@ -139,11 +131,12 @@ $("loc-q").addEventListener("input", (e) => {
     }
   }, 300);
 });
+// Browsers only offer geolocation in a secure context; phones on the LAN use plain http.
+if (window.isSecureContext && navigator.geolocation) $("loc-geo").hidden = false; else $("loc-geo-note").hidden = false;
 $("loc-geo").onclick = () => {
-  if (!navigator.geolocation) return status("loc-status", "This browser can't share its location; search for a city instead.", true);
   navigator.geolocation.getCurrentPosition(
     (p) => { $("loc-lat").value = p.coords.latitude.toFixed(4); $("loc-lon").value = p.coords.longitude.toFixed(4); },
-    () => status("loc-status", "Location permission denied or unavailable over plain http; search for a city instead.", true),
+    () => status("loc-status", "Location permission was denied; search for a city instead.", true),
   );
 };
 $("loc-save").onclick = () => {
@@ -166,7 +159,22 @@ $("yaml-save").onclick = async () => {
   config = body.config; render(); status("yaml-status", "Saved.");
 };
 $("yaml-reload").onclick = load;
-load().catch((e) => status("yaml-status", "Couldn't reach the server: " + e.message, true));
+async function boot() {
+  const session = await (await fetch("/api/session")).json();
+  if (!session.hasAdmin) return (location.href = "/setup");
+  $("login").hidden = session.authenticated; $("app").hidden = !session.authenticated;
+  if (session.authenticated) await load();
+  else $("login-pw").focus();
+}
+$("login-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const res = await fetch("/api/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ password: $("login-pw").value }) });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return status("login-status", body.error || "Sign-in failed", true);
+  $("login-pw").value = ""; boot();
+};
+$("logout").onclick = async (e) => { e.preventDefault(); await fetch("/api/logout", { method: "POST" }); boot(); };
+boot().catch((e) => status("login-status", "Couldn't reach the server: " + e.message, true));
 </script>
 </body></html>`;
 }

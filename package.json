@@ -19,7 +19,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "slate": "tsx apps/server/src/bin.ts",
+    "build:binary": "node scripts/build-sea.mjs",
+    "test:acceptance": "playwright test -c playwright.acceptance.config.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -29,6 +32,7 @@
     "@types/node": "^22.19.1",
     "esbuild": "^0.28.2",
     "eslint": "^9.39.1",
+    "postject": "1.0.0-alpha.6",
     "prettier": "^3.6.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",

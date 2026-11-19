@@ -10,3 +10,5 @@ export * from "./config.ts";
 export * from "./bindings.ts";
 export * from "./registry.ts";
 export * from "./manifest.ts";
+export * from "./layouts.ts";
+export * from "./errors.ts";

@@ -1,35 +1,21 @@
-import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseConfig, type SlateConfig, type SlateConfigInput } from "@slate/core";
+import { parseConfig, type SlateConfig } from "@slate/core";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import { applyStarter, DEFAULT_STARTER, newDisplay, newToken } from "./starters.ts";
 
-/** Keyless starter: clock + weather. Weather shows "Set your location" until the user sets one. */
-export function starterConfig(token = randomBytes(18).toString("base64url")): SlateConfig {
-  const input: SlateConfigInput = {
+/**
+ * Pre-wizard config: the keyless Clock + Weather starter on one display. Weather shows
+ * "Set your location" until the user sets one, and night mode stays off so a fresh
+ * install during the evening doesn't come up dimmed.
+ */
+export function starterConfig(token = newToken()): SlateConfig {
+  const base = parseConfig({
     location: null,
-    instances: {
-      clock: { widget: "clock", settings: { face: "digital" } },
-      weather: { widget: "weather", settings: {} },
-    },
-    screens: {
-      home: {
-        name: "Clock + Weather",
-        grid: {
-          cols: 12,
-          rows: 8,
-          items: [
-            { instance: "clock", x: 0, y: 0, w: 7, h: 8 },
-            { instance: "weather", x: 7, y: 0, w: 5, h: 8 },
-          ],
-        },
-      },
-    },
-    playlists: { default: { items: [{ screen: "home", dwell: "5m" }] } },
-    displays: { main: { name: "This display", token, playlist: "default" } },
-  };
-  return parseConfig(input);
+    displays: { main: { ...newDisplay("default"), token } },
+  });
+  return applyStarter(base, DEFAULT_STARTER);
 }
 
 export class ConfigStore extends EventEmitter<{ change: [SlateConfig] }> {

@@ -78,8 +78,23 @@ describe("renderTrmnl", () => {
     expect(html).toBe("IT IS world");
   });
 
-  it("escapes nothing implicitly but cannot run code", async () => {
+  it("cannot run code", async () => {
     await expect(renderTrmnl("{{ constructor.constructor }}", {})).resolves.toBe("");
+  });
+
+  it("HTML-escapes output, including inside partials, unless piped through raw", async () => {
+    const evil = `<img src=x onerror="alert(1)">`;
+    await expect(renderTrmnl("<p>{{ v }}</p>", { v: evil })).resolves.toBe(
+      "<p>&lt;img src=x onerror=&#34;alert(1)&#34;&gt;</p>",
+    );
+    await expect(
+      renderTrmnl(`<a title="{{ v }}">`, { v: `" onmouseover="x` }),
+    ).resolves.not.toContain(`" onmouseover`);
+    const shared = `{% template t %}{{ v }}{% endtemplate %}`;
+    await expect(renderTrmnl(`{% render "t", v: v %}`, { v: "<b>" }, { shared })).resolves.toBe(
+      "&lt;b&gt;",
+    );
+    await expect(renderTrmnl("{{ v | raw }}", { v: "<b>ok</b>" })).resolves.toBe("<b>ok</b>");
   });
 
   it("extracts template blocks", () => {

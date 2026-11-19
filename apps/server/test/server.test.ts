@@ -37,7 +37,13 @@ function config(overrides: Partial<Record<keyof SlateConfig, unknown>> = {}) {
   });
 }
 
-async function setup(initial = config(), fetchImpl = vi.fn(async () => Response.json(forecast))) {
+const PASSWORD = "correct horse battery";
+
+async function freshSlate(
+  initial?: SlateConfig,
+  fetchImpl = vi.fn(async () => Response.json(forecast)),
+  address = "192.168.1.20",
+) {
   const slate = await createSlate({
     dataDir: mkdtempSync(join(tmpdir(), "slate-test-")),
     pluginDirs: [plugins],
@@ -45,9 +51,27 @@ async function setup(initial = config(), fetchImpl = vi.fn(async () => Response.
     initialConfig: initial,
     preferSource: true,
     fetch: fetchImpl,
+    clientAddress: () => address,
   });
-  const req = (path: string, init?: RequestInit) => slate.app.request(path, init);
-  return { ...slate, req, fetchImpl };
+  const raw = (path: string, init?: RequestInit) => slate.app.request(path, init);
+  return { ...slate, raw, fetchImpl };
+}
+
+const cookieOf = (res: Response) => (res.headers.get("set-cookie") ?? "").split(";")[0]!;
+const json = (body: unknown, extra: Record<string, string> = {}): RequestInit => ({
+  method: "POST",
+  headers: { "content-type": "application/json", host: "192.168.1.5:8787", ...extra },
+  body: JSON.stringify(body),
+});
+
+/** A server with an admin, and `req` that sends the admin's session cookie. */
+async function setup(initial = config(), fetchImpl = vi.fn(async () => Response.json(forecast))) {
+  const slate = await freshSlate(initial, fetchImpl);
+  slate.auth.createAdmin(PASSWORD);
+  const cookie = cookieOf(await slate.raw("/api/login", json({ password: PASSWORD })));
+  const req = (path: string, init: RequestInit = {}) =>
+    slate.raw(path, { ...init, headers: { ...(init.headers as object), cookie } });
+  return { ...slate, req, cookie };
 }
 
 describe("starter config", () => {
@@ -299,7 +323,8 @@ describe("ConnectorRuntime", () => {
     now = 16 * 60_000;
     await runtime.tick();
     const b = runtime.bindingsFor("weather").weather!;
-    expect(b.error).toMatch(/429/);
+    expect(b.error).toBe("Open-Meteo is limiting requests. Retrying later.");
+    expect(runtime.health()[0]!.detail).toMatch(/429/);
     expect((b.data as { now: { temp: number } }).now.temp).toBe(72);
     now += 10 * 60_000;
     await runtime.tick();

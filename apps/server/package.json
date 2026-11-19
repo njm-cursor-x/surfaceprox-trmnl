@@ -15,9 +15,11 @@
   "dependencies": {
     "@hono/node-server": "^2.1.9",
     "@slate/core": "workspace:*",
+    "@slate/framework": "workspace:*",
     "@slate/liquid-trmnl": "workspace:*",
     "@slate/sdk": "workspace:*",
     "hono": "^4.10.6",
+    "qrcode-generator": "^2.0.4",
     "yaml": "^2.8.1"
   }
 }

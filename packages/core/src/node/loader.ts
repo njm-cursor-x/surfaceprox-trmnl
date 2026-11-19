@@ -9,6 +9,8 @@ import { Registry } from "../registry.ts";
 export interface LoadOptions {
   /** Prefer `connector.ts` over a built `connector.mjs` (dev, with a TS loader). */
   preferSource?: boolean;
+  /** Appended to connector module URLs so `slate dev` can re-import edited files. */
+  cacheBust?: string;
 }
 
 const BUILT_FIRST = ["connector.mjs", "connector.js", "connector.ts"];
@@ -69,7 +71,8 @@ async function loadConnectors(dir: string, opts: LoadOptions): Promise<Connector
     .map((f) => join(dir, f))
     .find(existsSync);
   if (!file) return [];
-  const mod = (await import(pathToFileURL(file).href)) as { default?: Connector | Connector[] };
+  const url = pathToFileURL(file).href + (opts.cacheBust ? `?v=${opts.cacheBust}` : "");
+  const mod = (await import(url)) as { default?: Connector | Connector[] };
   const exported = mod.default;
   const list = Array.isArray(exported) ? exported : exported ? [exported] : [];
   for (const c of list) {
