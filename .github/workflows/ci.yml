@@ -182,6 +182,8 @@ jobs:
       - run: pnpm test:acceptance
         env:
           SCREENSHOT_DIR: acceptance-screenshots/linux
+      - if: failure()
+        run: sudo journalctl -u slate --no-pager -n 200
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -76,6 +76,13 @@ export async function expectWorkingScreen(page: Page, path: string, location: st
   const weather = page.frameLocator('.cell[data-instance="weather"] iframe');
   await expect(clock.locator("[data-clock-time]")).toHaveText(/^\d{1,2}:\d{2}/);
   await expect(weather.locator(".title_bar .title")).toHaveText(location);
-  await expect(weather.getByText(/-?\d+°F/).first()).toBeVisible({ timeout: 30_000 });
+  try {
+    await expect(weather.getByText(/-?\d+°F/).first()).toBeVisible({ timeout: 30_000 });
+  } catch (err) {
+    const health = await page.request.get("/api/health").then((r) => r.text(), String);
+    throw new Error(`No temperature on screen. Server connector health: ${health}`, {
+      cause: err,
+    });
+  }
   await expect(page.locator("body")).not.toHaveAttribute("data-night", "true");
 }
