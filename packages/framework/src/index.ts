@@ -27,7 +27,7 @@ export function frameworkScale(layout: LayoutName, px: { w: number; h: number })
  */
 export const ADAPTER_CSS = `
 html.trmnl,html.trmnl body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var(--ink)}
-.trmnl{--black:var(--ink);--white:var(--paper);--gray-30:var(--muted);--framework-text-primary:var(--ink);--framework-semantic-text-primary-text-color:var(--ink);--framework-semantic-text-primary-text-solid:var(--ink);--framework-semantic-text-inverse-text-color:var(--paper);--framework-canvas-text-color:var(--ink);--framework-surface-bg:var(--paper);--framework-semantic-surface-bg-color:var(--paper)}
-.trmnl .screen{--screen-w:100vw;--screen-h:100vh;--full-w:100vw;--full-h:100vh;--half_horizontal-w:100vw;--half_horizontal-h:100vh;--half_vertical-w:100vw;--half_vertical-h:100vh;--quadrant-w:100vw;--quadrant-h:100vh;width:100vw;height:100vh;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.trmnl .screen{--black:var(--ink);--white:var(--paper);--gray-30:var(--muted);--framework-text-primary:var(--ink);--framework-semantic-text-primary-text-color:var(--ink);--framework-semantic-text-primary-text-solid:var(--ink);--framework-semantic-text-inverse-text-color:var(--paper);--framework-canvas-text-color:var(--ink);--framework-canvas-text-solid:var(--ink);--framework-surface-bg:var(--paper);--framework-semantic-surface-bg-color:var(--paper);--screen-w:100vw;--screen-h:100vh;--full-w:100vw;--full-h:100vh;--half_horizontal-w:100vw;--half_horizontal-h:100vh;--half_vertical-w:100vw;--half_vertical-h:100vh;--quadrant-w:100vw;--quadrant-h:100vh;width:100vw;height:100vh;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.trmnl .screen *{font-family:inherit;-webkit-font-smoothing:inherit}
 .trmnl .title_bar{border-top:2px solid var(--rule)}
 `;

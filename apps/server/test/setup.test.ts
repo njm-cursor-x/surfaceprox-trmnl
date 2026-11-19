@@ -157,6 +157,8 @@ describe("first-run setup", () => {
       body: JSON.stringify({ password: PASSWORD, code }),
     });
     expect(form.status).toBe(415);
+    const huge = await s.post("/api/setup/admin", { password: "x".repeat(2 * 1024 * 1024), code });
+    expect(huge.status).toBe(413);
     expect(s.auth.hasAdmin()).toBe(false);
   });
 
